@@ -138,7 +138,6 @@ class _ReproductorHandler extends BaseAudioHandler with SeekHandler {
         playing: estado.playing,
         updatePosition: _player.position,
         bufferedPosition: _player.bufferedPosition,
-        speed: estado.speed,
       ),
     );
   }
