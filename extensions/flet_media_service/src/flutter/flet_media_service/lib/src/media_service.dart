@@ -11,7 +11,7 @@ class MediaService extends FletService {
   MediaService({required super.control});
 
   final AudioPlayer _player = AudioPlayer();
-  Future<AudioHandler>? _handler;
+  _ReproductorHandler? _handler;
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<PlayerState>? _stateSubscription;
   int _ultimaPosicion = -1;
@@ -35,13 +35,13 @@ class MediaService extends FletService {
       });
     });
 
-    _handler = AudioService.init(
-      builder: () => _ReproductorHandler(_player),
+    _handler = _ReproductorHandler(_player);
+    AudioService.init(
+      builder: () => _handler!,
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'franzpy.youtube_catalog.audio',
         androidNotificationChannelName: 'Reproducción de video',
         androidNotificationIcon: 'drawable/ic_stat_notify',
-        androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
       ),
     );
@@ -54,9 +54,9 @@ class MediaService extends FletService {
         await _player.setUrl(url);
         final posicion = int.tryParse(args["position"]?.toString() ?? "0") ?? 0;
         if (posicion > 0) await _player.seek(Duration(seconds: posicion));
-        final handler = await _handler;
-        handler.mediaItem.add(
-          MediaItem(
+        final handler = _handler;
+        if (handler != null) {
+          final item = MediaItem(
             id: url,
             title: args["titulo"]?.toString() ?? "YouTube Catalog",
             artist: "YouTube",
@@ -67,8 +67,10 @@ class MediaService extends FletService {
             duration: Duration(
               seconds: int.tryParse(args["duration"]?.toString() ?? "0") ?? 0,
             ),
-          ),
-        );
+          );
+          handler.mediaItem.add(item);
+          handler.queue.add([item]);
+        }
         await _player.play();
         return null;
 
@@ -137,7 +139,6 @@ class _ReproductorHandler extends BaseAudioHandler with SeekHandler {
         updatePosition: _player.position,
         bufferedPosition: _player.bufferedPosition,
         speed: estado.speed,
-        queue: mediaItem.value == null ? [] : [mediaItem.value!],
       ),
     );
   }
