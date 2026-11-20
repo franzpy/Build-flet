@@ -52,6 +52,14 @@ def main(page: ft.Page) -> None:
     page.padding = 0
     page.spacing = 0
 
+    async def fijar_orientacion() -> None:
+        try:
+            await page.set_allowed_device_orientations([ft.DeviceOrientation.PORTRAIT_UP])
+        except Exception:
+            pass
+
+    page.run_task(fijar_orientacion)
+
     state = {
         "tab": 0,
         "categoria": None,
