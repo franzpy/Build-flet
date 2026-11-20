@@ -1,0 +1,7 @@
+site_name: FletMediaService
+
+theme:
+  name: "material"
+
+plugins:
+  - mkdocstrings

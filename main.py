@@ -18,6 +18,11 @@ try:
 except ImportError:
     ftn = None
 
+try:
+    from flet_media_service import MediaService
+except ImportError:
+    MediaService = None
+
 import db
 import proxyserver
 import youtube
@@ -39,8 +44,16 @@ def main(page: ft.Page) -> None:
     if not empaquetado:
         proxyserver.start()
 
+    media = None
+    if empaquetado and MediaService is not None:
+        try:
+            media = MediaService()
+            media.on_position_change = lambda e: on_media_position(e)
+        except Exception:
+            media = None
+
     notificaciones = None
-    if empaquetado and ftn is not None:
+    if media is None and empaquetado and ftn is not None:
         try:
             notificaciones = ftn.Notifications(android_default_icon="ic_stat_notify")
         except Exception:
@@ -141,6 +154,8 @@ def main(page: ft.Page) -> None:
     def on_nav(e) -> None:
         if state.get("player_id"):
             page.run_task(detener_notificacion)
+            if media is not None:
+                page.run_task(media.stop)
         state["tab"] = e.control.selected_index
         state["player_id"] = None
         render()
@@ -149,6 +164,63 @@ def main(page: ft.Page) -> None:
         if e.state in (ft.AppLifecycleState.PAUSE, ft.AppLifecycleState.HIDE,
                        ft.AppLifecycleState.INACTIVE):
             page.run_task(save_current)
+            if media is not None:
+                page.run_task(pasar_a_segundo_plano)
+        elif e.state in (ft.AppLifecycleState.RESUME, ft.AppLifecycleState.SHOW):
+            if media is not None:
+                page.run_task(volver_a_primer_plano)
+
+    def on_media_position(e) -> None:
+        try:
+            datos = e.data if isinstance(e.data, dict) else {}
+            seg = int(datos.get("position", 0))
+        except Exception:
+            return
+        vid = state.get("player_id")
+        if vid:
+            db.save_progress(vid, seg, 0)
+            saved_label.value = f"Guardado: {youtube.fmt_time(seg)}"
+            page.update()
+
+    async def pasar_a_segundo_plano() -> None:
+        vid = state.get("player_id")
+        if not vid or media is None:
+            return
+        v = db.get_video(vid)
+        if not v:
+            return
+        try:
+            pos = int((await video.get_current_position()).in_seconds)
+        except Exception:
+            prog = db.get_progress(vid)
+            pos = prog.posicion_seg if prog else 0
+        try:
+            await media.play(
+                url=state["media_url"],
+                titulo=v.titulo,
+                caratula=v.thumbnail,
+                posicion=pos,
+                duracion=v.duracion,
+            )
+            await video.pause()
+        except Exception:
+            pass
+
+    async def volver_a_primer_plano() -> None:
+        vid = state.get("player_id")
+        if not vid or media is None:
+            return
+        try:
+            pos = await media.get_position()
+            await media.stop()
+        except Exception:
+            prog = db.get_progress(vid)
+            pos = prog.posicion_seg if prog else 0
+        try:
+            await video.seek(ft.Duration(seconds=int(pos)))
+            await video.play()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Notificación / foreground service (solo dentro del APK)
@@ -289,6 +361,11 @@ def main(page: ft.Page) -> None:
 
     async def volver(e=None) -> None:
         await save_current()
+        if media is not None:
+            try:
+                await media.stop()
+            except Exception:
+                pass
         await detener_notificacion()
         state["player_id"] = None
         state["tab"] = 0

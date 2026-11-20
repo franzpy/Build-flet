@@ -7,6 +7,7 @@ dependencies = [
     "flet>=1.1.2",
     "flet-video>=1.1.2",
     "flet-notifications>=1.1.2",
+    "flet-media-service @ git+https://github.com/franzpy/Build-flet.git@main#subdirectory=extensions/flet_media_service",
     "yt-dlp>=2026.1.1",
 ]
 
@@ -27,5 +28,9 @@ res_dir = "android_res"
 "android.permission.POST_NOTIFICATIONS" = true
 
 [tool.flet.android.service."com.dexterous.flutterlocalnotifications.ForegroundService"]
+exported = false
+foregroundServiceType = "mediaPlayback"
+
+[tool.flet.android.service."com.ryanheise.audioservice.AudioService"]
 exported = false
 foregroundServiceType = "mediaPlayback"

@@ -1,0 +1,20 @@
+name: flet_media_service
+description: Servicio de reproducción en segundo plano para Flet
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: ">=3.47.0"
+
+dependencies:
+  flet: ^1.1.2
+  flutter:
+    sdk: flutter
+  audio_service: ^0.18.19
+  just_audio: ^0.9.46
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
