@@ -84,6 +84,9 @@ def main(page: ft.Page) -> None:
         "media_url": "",
         "headers": {},
         "empaquetado": empaquetado,
+        "en_segundo_plano": False,
+        "transicion": False,
+        "playlist_id": None,
     }
 
     header = ft.Column(spacing=8)
@@ -158,6 +161,8 @@ def main(page: ft.Page) -> None:
                 page.run_task(media.stop)
         state["tab"] = e.control.selected_index
         state["player_id"] = None
+        state["playlist_id"] = None
+        state["en_segundo_plano"] = False
         render()
 
     def on_lifecycle(e) -> None:
@@ -172,8 +177,7 @@ def main(page: ft.Page) -> None:
 
     def on_media_position(e) -> None:
         try:
-            datos = e.data if isinstance(e.data, dict) else {}
-            seg = int(datos.get("position", 0))
+            seg = int(getattr(e, "position", 0) or 0)
         except Exception:
             return
         vid = state.get("player_id")
@@ -184,43 +188,55 @@ def main(page: ft.Page) -> None:
 
     async def pasar_a_segundo_plano() -> None:
         vid = state.get("player_id")
-        if not vid or media is None:
+        if (not vid or media is None or state["en_segundo_plano"]
+                or state["transicion"]):
             return
-        v = db.get_video(vid)
-        if not v:
-            return
+        state["transicion"] = True
         try:
-            pos = int((await video.get_current_position()).in_seconds)
-        except Exception:
-            prog = db.get_progress(vid)
-            pos = prog.posicion_seg if prog else 0
-        try:
-            await media.play(
-                url=state["media_url"],
-                titulo=v.titulo,
-                caratula=v.thumbnail,
-                posicion=pos,
-                duracion=v.duracion,
-            )
-            await video.pause()
-        except Exception:
-            pass
+            v = db.get_video(vid)
+            if not v:
+                return
+            try:
+                pos = int((await video.get_current_position()).in_seconds)
+            except Exception:
+                prog = db.get_progress(vid)
+                pos = prog.posicion_seg if prog else 0
+            try:
+                await media.play(
+                    url=state["media_url"],
+                    titulo=v.titulo,
+                    caratula=v.thumbnail,
+                    posicion=pos,
+                    duracion=v.duracion,
+                )
+                await video.pause()
+                state["en_segundo_plano"] = True
+            except Exception:
+                pass
+        finally:
+            state["transicion"] = False
 
     async def volver_a_primer_plano() -> None:
         vid = state.get("player_id")
-        if not vid or media is None:
+        if (not vid or media is None or not state["en_segundo_plano"]
+                or state["transicion"]):
             return
+        state["transicion"] = True
         try:
-            pos = await media.get_position()
-            await media.stop()
-        except Exception:
-            prog = db.get_progress(vid)
-            pos = prog.posicion_seg if prog else 0
-        try:
-            await video.seek(ft.Duration(seconds=int(pos)))
-            await video.play()
-        except Exception:
-            pass
+            try:
+                pos = await media.get_position()
+                await media.stop()
+            except Exception:
+                prog = db.get_progress(vid)
+                pos = prog.posicion_seg if prog else 0
+            try:
+                await video.seek(ft.Duration(seconds=int(pos)))
+                await video.play()
+                state["en_segundo_plano"] = False
+            except Exception:
+                pass
+        finally:
+            state["transicion"] = False
 
     # ------------------------------------------------------------------
     # Notificación / foreground service (solo dentro del APK)
@@ -368,6 +384,8 @@ def main(page: ft.Page) -> None:
                 pass
         await detener_notificacion()
         state["player_id"] = None
+        state["playlist_id"] = None
+        state["en_segundo_plano"] = False
         state["tab"] = 0
         render()
 
@@ -415,9 +433,11 @@ def main(page: ft.Page) -> None:
             f"{youtube.fmt_time(guardada)} / {youtube.fmt_time(v.duracion)}"
         )
         saved_label.value = f"Guardado: {youtube.fmt_time(guardada)}"
-        video.playlist = [
-            ftv.VideoMedia(state["media_url"], http_headers=state["headers"])
-        ]
+        if state.get("playlist_id") != v.id:
+            video.playlist = [
+                ftv.VideoMedia(state["media_url"], http_headers=state["headers"])
+            ]
+            state["playlist_id"] = v.id
         page.floating_action_button = None
         nav.visible = False
         page.appbar = ft.AppBar(

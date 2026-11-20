@@ -41,7 +41,7 @@ class MediaService extends FletService {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'franzpy.youtube_catalog.audio',
         androidNotificationChannelName: 'Reproducción de video',
-        androidNotificationIcon: 'drawable/ic_stat_notify',
+        androidNotificationIcon: 'mipmap/ic_launcher',
         androidStopForegroundOnPause: false,
       ),
     );

@@ -6,15 +6,17 @@ play/pause/seek, pantalla de bloqueo y botones de auriculares.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 import flet as ft
+
+from flet_media_service.types import MediaPositionChangeEvent, MediaStateChangeEvent
 
 
 @ft.control("MediaService")
 class MediaService(ft.Service):
-    on_position_change: Optional[ft.EventHandler] = None
-    on_state_change: Optional[ft.EventHandler] = None
+    on_position_change: Optional[ft.EventHandler[MediaPositionChangeEvent]] = None
+    on_state_change: Optional[ft.EventHandler[MediaStateChangeEvent]] = None
 
     async def play(
         self,
