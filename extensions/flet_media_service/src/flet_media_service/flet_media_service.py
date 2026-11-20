@@ -4,8 +4,6 @@ Expone reproducción en segundo plano con MediaSession real: notificación con
 play/pause/seek, pantalla de bloqueo y botones de auriculares.
 """
 
-from __future__ import annotations
-
 from typing import Optional
 
 import flet as ft
