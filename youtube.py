@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
-import sys
 import threading
 import time
 import urllib.parse
 import urllib.request
+
+import yt_dlp
 
 _ID_PATTERNS = [
     r"(?:youtube\.com/watch|m\.youtube\.com/watch)[?&#/]+.*?\bv=([\w-]{11})",
@@ -51,19 +51,18 @@ def fetch_metadata(url: str, video_id: str) -> dict:
         "duracion": 0,
     }
     try:
-        out = subprocess.run(
-            [
-                sys.executable, "-m", "yt_dlp",
-                "--dump-single-json", "--skip-download", "--no-warnings",
-                "--socket-timeout", "8", "--no-playlist",
-                canonical_url(video_id),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=25,
-        )
-        if out.returncode == 0 and out.stdout.strip():
-            info = json.loads(out.stdout)
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "socket_timeout": 10,
+            "noplaylist": True,
+            # El Python embebido de Android a veces no encuentra el bundle de CA.
+            "nocheckcertificate": True,
+        }
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(canonical_url(video_id), download=False)
+        if info:
             result["titulo"] = (info.get("title") or result["titulo"])[:200]
             result["duracion"] = int(info.get("duration") or 0)
             # Usar siempre la miniatura JPEG estable (las maxres .webp fallan en móvil).
@@ -96,22 +95,25 @@ def get_stream(video_id: str) -> tuple[str, dict]:
         if cached and cached[2] > time.time():
             return cached[0], dict(cached[1])
 
-    cmd = [
-        sys.executable, "-m", "yt_dlp",
-        "-f", "18/best[acodec!=none][vcodec!=none]/best",
-        "--get-url", "--no-warnings", "--socket-timeout", "10",
-        "--extractor-args", "youtube:player_client=android",
-        canonical_url(video_id),
-    ]
-    out = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
+    opts = {
+        "format": "18/best[acodec!=none][vcodec!=none]/best",
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "socket_timeout": 15,
+        "extractor_args": {"youtube": {"player_client": ["android"]}},
+        "nocheckcertificate": True,
+    }
     url = ""
-    for line in out.stdout.splitlines():
-        line = line.strip()
-        if line.startswith("http"):
-            url = line
-            break
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(canonical_url(video_id), download=False)
+        url = (info.get("url") or "") if info else ""
+    except Exception as ex:
+        raise RuntimeError(str(ex)[:200])
+
     if not url:
-        raise RuntimeError(out.stderr.strip()[:200] or "No se pudo resolver el stream")
+        raise RuntimeError("No se pudo resolver el stream")
 
     headers = dict(_HEADERS)
     with _STREAM_LOCK:
