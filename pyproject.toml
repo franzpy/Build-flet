@@ -1,0 +1,31 @@
+[project]
+name = "youtube-catalog"
+version = "0.1.0"
+description = "Catálogo de videos de YouTube con reproducción en segundo plano"
+requires-python = ">=3.10"
+dependencies = [
+    "flet>=1.1.2",
+    "flet-video>=1.1.2",
+    "flet-notifications>=1.1.2",
+    "yt-dlp>=2026.1.1",
+]
+
+[tool.flet]
+product = "YouTube Catalog"
+org = "franzpy"
+
+[tool.flet.android]
+min_sdk_version = 24
+target_sdk_version = 35
+res_dir = "android_res"
+
+[tool.flet.android.permission]
+"android.permission.INTERNET" = true
+"android.permission.WAKE_LOCK" = true
+"android.permission.FOREGROUND_SERVICE" = true
+"android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" = true
+"android.permission.POST_NOTIFICATIONS" = true
+
+[tool.flet.android.service."com.dexterous.flutterlocalnotifications.ForegroundService"]
+exported = false
+foregroundServiceType = "mediaPlayback"
